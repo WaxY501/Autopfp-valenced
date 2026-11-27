@@ -1,0 +1,13 @@
+{
+  "format": 1,
+  "id": "dev.khopdi.autopfp",
+  "name": "AutoPFP Rotator",
+  "description": "Automatically rotates your Discord avatar from a search theme.",
+  "author": "Khopdi Todo",
+  "version": "0.1.0",
+  "dependencies": {
+    "valenced.api": { "version": ">=1" },
+    "discord": { "version": "*" }
+  },
+  "dist": { "script": "index.js" }
+}
