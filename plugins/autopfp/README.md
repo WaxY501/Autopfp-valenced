@@ -1,23 +1,20 @@
 # AutoPFP Rotator
 
-AutoPFP Core v1.
-
 ## Implemented
-- Image URL collection
-- HTTPS URL validation
+- Core image pool
 - Duplicate URL prevention
-- Image removal
-- Random selection
-- Avoid immediate repeats
+- Random image selection
+- Repeat protection
 - Rotation timer
-- Start and stop rotation logic
+- Wikimedia Commons image search
+- Search result title and image URLs
+- Thumbnail results
 
-## Not yet implemented
-- Image search provider
-- Image downloading and local storage
-- Gallery interface
-- Persistent settings
-- Image processing
-- Automatic Discord avatar modification
+## Upcoming
+- Gallery UI
+- Download and local image storage
+- Image cropping and compression
+- Saved themes and settings
+- Rotation interface
 
-This core manages image URLs and rotation callbacks only.
+Automatic Discord account avatar modification is not implemented.
