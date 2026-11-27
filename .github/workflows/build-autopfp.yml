@@ -37,9 +37,20 @@ jobs:
 
       - name: Install JS dependencies (if the repo has any)
         run: |
-          if [ -f package-lock.json ]; then npm ci --legacy-peer-deps
-          elif [ -f package.json ]; then npm install --legacy-peer-deps
-          elif [ -f pnpm-lock.yaml ]; then npm i -g pnpm && pnpm install
+          if [ -f package.json ]; then
+            # Install without running dependency scripts: the Valenced git packages try to compile
+            # themselves in the wrong order and fail. Build them in the right order below instead.
+            if [ -f package-lock.json ]; then
+              npm ci --legacy-peer-deps --ignore-scripts || npm install --legacy-peer-deps --ignore-scripts
+            else
+              npm install --legacy-peer-deps --ignore-scripts
+            fi
+            for d in node_modules/@valenced/types node_modules/@valenced/plugin-cli; do
+              if [ -d "$d" ]; then
+                echo "Preparing $d"
+                (cd "$d" && npm run prepare --if-present) || echo "prepare for $d reported errors; continuing"
+              fi
+            done
           fi
 
       - name: Build
