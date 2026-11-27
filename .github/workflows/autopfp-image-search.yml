@@ -1,0 +1,109 @@
+name: AutoPFP Image Search
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Add Image Search Engine
+        run: |
+          mkdir -p plugins/autopfp/js
+
+          cat > plugins/autopfp/js/imageSearch.ts <<'EOF'
+          export type SearchImage = {
+            title: string
+            url: string
+            originalUrl: string
+          }
+
+          export class AutoPfpImageSearch {
+            private endpoint =
+              'https://commons.wikimedia.org/w/api.php'
+
+            async search(
+              query: string,
+              limit = 30
+            ): Promise<SearchImage[]> {
+              const cleaned = query.trim()
+              if (!cleaned) return []
+
+              const params = new URLSearchParams({
+                action: 'query',
+                generator: 'search',
+                gsrsearch: cleaned,
+                gsrnamespace: '6',
+                gsrlimit: String(Math.min(Math.max(limit, 1), 50)),
+                prop: 'imageinfo',
+                iiprop: 'url',
+                iiurlwidth: '512',
+                format: 'json',
+                origin: '*'
+              })
+
+              const response = await fetch(
+                `${this.endpoint}?${params.toString()}`
+              )
+
+              if (!response.ok) {
+                throw new Error(
+                  `Image search failed: HTTP ${response.status}`
+                )
+              }
+
+              const data = await response.json()
+              const pages = Object.values(
+                data?.query?.pages ?? {}
+              ) as any[]
+
+              return pages
+                .filter(page => page.imageinfo?.[0]?.thumburl)
+                .map(page => ({
+                  title: page.title.replace(/^File:/, ''),
+                  url: page.imageinfo[0].thumburl,
+                  originalUrl: page.imageinfo[0].url
+                }))
+                .filter(image =>
+                  /\.(jpg|jpeg|png|webp)$/i.test(image.url)
+                && !image.url.toLowerCase().includes('.svg')
+                )
+            }
+          }
+          EOF
+
+          cat > plugins/autopfp/README.md <<'EOF'
+          # AutoPFP Rotator
+
+          ## Implemented
+          - Core image pool
+          - Duplicate URL prevention
+          - Random image selection
+          - Repeat protection
+          - Rotation timer
+          - Wikimedia Commons image search
+          - Search result title and image URLs
+          - Thumbnail results
+
+          ## Upcoming
+          - Gallery UI
+          - Download and local image storage
+          - Image cropping and compression
+          - Saved themes and settings
+          - Rotation interface
+
+          Automatic Discord account avatar modification is not implemented.
+          EOF
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add plugins/autopfp/
+          git diff --cached --quiet || git commit -m "Add AutoPFP image search engine"
+          git push
