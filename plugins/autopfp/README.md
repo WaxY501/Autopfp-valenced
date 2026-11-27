@@ -1,20 +1,20 @@
 # AutoPFP Rotator
 
-## Implemented
-- Core image pool
-- Duplicate URL prevention
-- Random image selection
-- Repeat protection
-- Rotation timer
+## Modules
+- Image pool and random rotation core
 - Wikimedia Commons image search
-- Search result title and image URLs
-- Thumbnail results
+- Persistent image gallery using IndexedDB
+- Import images from files
+- Download images from URLs
+- Export images from gallery
+- Image processing and square resizing
+- JPEG compression
 
-## Upcoming
-- Gallery UI
-- Download and local image storage
-- Image cropping and compression
-- Saved themes and settings
-- Rotation interface
+## Storage
+Gallery images are stored locally in IndexedDB.
 
-Automatic Discord account avatar modification is not implemented.
+## Status
+Modules are source components and are not yet fully
+integrated into a finished plugin interface.
+
+Automatic Discord account avatar modification is not included.
