@@ -1,0 +1,39 @@
+name: Extract AutoPFP One-Click ZIP
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract installer ZIP into repository root
+        shell: bash
+        run: |
+          set -euo pipefail
+          ZIP_FILE="autopfp-one-click.zip"
+          if [[ ! -f "$ZIP_FILE" ]]; then
+            echo "ERROR: $ZIP_FILE not found in repository root. Upload it there first."
+            exit 1
+          fi
+          unzip -o "$ZIP_FILE" -d .
+          test -f .github/workflows/autopfp-one-click.yml
+          echo "Extraction complete. Installer workflow is now present."
+
+      - name: Commit and push extracted files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/autopfp-one-click.yml README-INSTALL.txt
+          if git diff --cached --quiet; then
+            echo "No extracted changes to commit."
+          else
+            git commit -m "Extract AutoPFP one-click installer workflow"
+            git push
+          fi
