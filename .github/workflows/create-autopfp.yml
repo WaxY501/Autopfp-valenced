@@ -1,0 +1,85 @@
+
+name: Create AutoPFP Plugin
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  create-plugin:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create AutoPFP plugin
+        run: |
+          mkdir -p plugins/autopfp/js
+
+          cat > plugins/autopfp/manifest.json <<'EOF'
+          {
+            "format": 1,
+            "id": "com.khopdi.autopfp",
+            "name": "AutoPFP Rotator",
+            "description": "Search-themed profile picture rotation manager",
+            "author": "Khopdi Todo",
+            "version": "1.0.0",
+            "dependencies": {
+              "valenced.api": {
+                "version": ">=1 <2"
+              },
+              "discord": {
+                "version": "*"
+              }
+            },
+            "dist": {
+              "script": "index.js"
+            }
+          }
+          EOF
+
+          cat > plugins/autopfp/tsconfig.json <<'EOF'
+          {
+            "extends": "../../tsconfig.base.json"
+          }
+          EOF
+
+          cat > plugins/autopfp/js/index.ts <<'EOF'
+          export default plugin({
+            start() {
+              console.log("[AutoPFP] Plugin loaded.")
+            },
+            stop() {
+              console.log("[AutoPFP] Plugin stopped.")
+            }
+          })
+          EOF
+
+          cat > plugins/autopfp/README.md <<'EOF'
+          # AutoPFP Rotator
+
+          Plugin scaffold for a themed profile-picture rotation manager.
+
+          Planned features:
+          - Search/theme input
+          - Random image selection
+          - Square cropping and image resizing
+          - Rotation interval
+          - Start and Stop
+          - Change Now
+          - Repeat protection
+
+          Automatic Discord account avatar modification is not implemented.
+          EOF
+
+      - name: Commit files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add plugins/autopfp
+          git commit -m "Create AutoPFP plugin scaffold" || exit 0
+          git push
+          
