@@ -1,18 +1,16 @@
 # AutoPFP Rotator
 
-## Implemented source modules
-- Rotation core and timer callback
+## Current modules
+- Rotation preview core (preview callback only; no Discord avatar modification)
 - Wikimedia Commons image search
-- Settings screen with image search results and previews
-- Add/remove images from a session gallery
-- Manual image URL entry
-- Preview rotation timer and manual previous/next
-- Session-only named collections/themes
-- Preview crop mode and size/quality preference fields
+- Persistent IndexedDB gallery with image import-from-URL/file and download helpers
+- Gallery UI wired to IndexedDB
+- Persistent named collections/themes stored in IndexedDB
+- Square resize and JPEG quality processing wired to settings
+- Fill/crop and fit/contain processing modes
 
-## Limitations in this stage
-- Session gallery and collections are in-memory only (not persistent).
-- Device file picker is not connected; add images through search or URL.
-- Processing fields are UI settings only; actual resize/compression is not wired into the settings screen.
-- Preview rotation only changes the displayed preview. It does not modify a Discord avatar.
-- Full plugin packaging/build validation requires the Valenced API dependencies and is not performed by this workflow.
+## Stage 4 caveats
+- Device file import uses a web-style input picker; confirm it works in the target Valenced Android runtime.
+- URL image fetch may fail on sources that disallow cross-origin downloads.
+- The workflow performs source checks, not a full Valenced package build.
+- No automated Discord avatar modification is implemented.

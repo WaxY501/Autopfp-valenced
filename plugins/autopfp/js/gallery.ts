@@ -6,8 +6,11 @@ export type GalleryImage = {
 }
 
 const DB_NAME = 'autopfp-gallery'
-const DB_VERSION = 1
+const DB_VERSION = 2
 const STORE_NAME = 'images'
+const COLLECTION_STORE = 'collections'
+
+export type SavedCollection = { id: string; name: string; imageIds: string[]; updatedAt: number }
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -17,9 +20,10 @@ function openDatabase(): Promise<IDBDatabase> {
       const db = request.result
 
       if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, {
-          keyPath: 'id'
-        })
+        db.createObjectStore(STORE_NAME, { keyPath: 'id' })
+      }
+      if (!db.objectStoreNames.contains(COLLECTION_STORE)) {
+        db.createObjectStore(COLLECTION_STORE, { keyPath: 'id' })
       }
     }
 
@@ -140,6 +144,58 @@ export class AutoPfpGallery {
     })
   }
 
+    async getCollections(): Promise<SavedCollection[]> {
+    const db = await openDatabase()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(COLLECTION_STORE, 'readonly')
+      const req = tx.objectStore(COLLECTION_STORE).getAll()
+      req.onsuccess = () => resolve((req.result as SavedCollection[]).sort((a, b) => b.updatedAt - a.updatedAt))
+      req.onerror = () => reject(req.error)
+    })
+  }
+
+  async saveCollection(name: string, imageIds: string[], id?: string): Promise<SavedCollection> {
+    const cleanName = name.trim()
+    if (!cleanName || imageIds.length === 0) throw new Error('Collection name and at least one image are required')
+    const collection: SavedCollection = { id: id || crypto.randomUUID(), name: cleanName, imageIds: [...imageIds], updatedAt: Date.now() }
+    const db = await openDatabase()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(COLLECTION_STORE, 'readwrite')
+      tx.objectStore(COLLECTION_STORE).put(collection)
+      tx.oncomplete = () => resolve(collection)
+      tx.onerror = () => reject(tx.error)
+    })
+  }
+
+  async removeCollection(id: string): Promise<void> {
+    const db = await openDatabase()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(COLLECTION_STORE, 'readwrite')
+      tx.objectStore(COLLECTION_STORE).delete(id)
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error)
+    })
+  }
+
+  async pickFilesFromDevice(): Promise<GalleryImage[]> {
+    if (typeof document === 'undefined') throw new Error('Device file picker is not available in this runtime')
+    return new Promise((resolve, reject) => {
+      const input = document.createElement('input')
+      input.type = 'file'
+      input.accept = 'image/*'
+      input.multiple = true
+      input.onchange = async () => {
+        try {
+          const files = Array.from(input.files || [])
+          const added = await Promise.all(files.map(file => this.addFromFile(file)))
+          resolve(added)
+        } catch (error) { reject(error) }
+      }
+      input.click()
+    })
+  }
+
+
   async download(image: GalleryImage): Promise<void> {
     const link = document.createElement('a')
 
@@ -151,7 +207,8 @@ export class AutoPfpGallery {
   async processImage(
     image: GalleryImage,
     size = 512,
-    quality = 0.92
+    quality = 0.92,
+    mode: 'cover' | 'contain' = 'cover'
   ): Promise<GalleryImage> {
     const img = await this.loadImage(image.dataUrl)
 
@@ -165,10 +222,9 @@ export class AutoPfpGallery {
       throw new Error('Canvas unavailable')
     }
 
-    const scale = Math.max(
-      size / img.width,
-      size / img.height
-    )
+    const scale = mode === 'cover'
+      ? Math.max(size / img.width, size / img.height)
+      : Math.min(size / img.width, size / img.height)
 
     const width = img.width * scale
     const height = img.height * scale
@@ -176,7 +232,13 @@ export class AutoPfpGallery {
     const x = (size - width) / 2
     const y = (size - height) / 2
 
-    ctx.drawImage(img, x, y, width, height)
+    if (mode === 'cover') {
+      ctx.drawImage(img, x, y, width, height)
+    } else {
+      ctx.fillStyle = '#000'
+      ctx.fillRect(0, 0, size, size)
+      ctx.drawImage(img, x, y, width, height)
+    }
 
     const processed = {
       ...image,
