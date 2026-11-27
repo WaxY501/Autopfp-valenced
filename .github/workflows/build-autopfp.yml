@@ -35,16 +35,39 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Show what the repo contains (for debugging)
+        run: |
+          echo "--- repo root ---"; ls -la
+          echo "--- package.json ---"; cat package.json 2>/dev/null || echo "(no package.json)"
+          echo "--- gradle files ---"; ls -la gradlew settings.gradle* build.gradle* 2>&1 || true
+
       - name: Install JS dependencies (if the repo has any)
         run: |
           if [ -f package.json ]; then
-            # Install without running dependency scripts: the Valenced git packages try to compile
-            # themselves in the wrong order and fail. Build them in the right order below instead.
-            if [ -f package-lock.json ]; then
-              npm ci --legacy-peer-deps --ignore-scripts || npm install --legacy-peer-deps --ignore-scripts
-            else
-              npm install --legacy-peer-deps --ignore-scripts
-            fi
+            # npm cannot install Valenced's git packages on a clean machine: it compiles them in the
+            # wrong order and fails. Fetch the same code as plain tarballs instead (no compile step
+            # runs for those), then build the packages ourselves in the right order.
+            cat > /tmp/tarballs.mjs <<'JS'
+          import fs from 'fs'
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'))
+          const toTar = spec => {
+            let m = /^(?:git\+)?https:\/\/github\.com\/([^/]+\/[^/#]+?)(?:\.git)?(?:#(.+))?$/.exec(spec)
+            if (!m) m = /^github:([^#]+)(?:#(.+))?$/.exec(spec)
+            return m ? `https://codeload.github.com/${m[1]}/tar.gz/${m[2] || 'HEAD'}` : null
+          }
+          const overrides = { ...(pkg.overrides || {}) }
+          for (const section of ['dependencies', 'devDependencies', 'optionalDependencies']) {
+            for (const [name, spec] of Object.entries(pkg[section] || {})) {
+              const tar = toTar(String(spec))
+              if (tar) { pkg[section][name] = tar; overrides[name] = tar; console.log('tarball:', name, tar) }
+            }
+          }
+          pkg.overrides = overrides
+          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2))
+          JS
+            node /tmp/tarballs.mjs
+            rm -f package-lock.json
+            npm install --legacy-peer-deps --ignore-scripts
             for d in node_modules/@valenced/types node_modules/@valenced/plugin-cli; do
               if [ -d "$d" ]; then
                 echo "Preparing $d"
@@ -55,6 +78,7 @@ jobs:
 
       - name: Build
         run: |
+          if [ ! -f ./gradlew ]; then echo "ERROR: no gradlew in the repo root - the Gradle build files are missing from the repository."; exit 1; fi
           chmod +x ./gradlew
           ./gradlew packageAutopfpPlugin --stacktrace
 
