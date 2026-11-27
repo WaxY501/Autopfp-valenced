@@ -1,14 +1,23 @@
 # AutoPFP Rotator
 
-Plugin scaffold for a themed profile-picture rotation manager.
+AutoPFP Core v1.
 
-Planned features:
-- Search/theme input
-- Random image selection
-- Square cropping and image resizing
-- Rotation interval
-- Start and Stop
-- Change Now
-- Repeat protection
+## Implemented
+- Image URL collection
+- HTTPS URL validation
+- Duplicate URL prevention
+- Image removal
+- Random selection
+- Avoid immediate repeats
+- Rotation timer
+- Start and stop rotation logic
 
-Automatic Discord account avatar modification is not implemented.
+## Not yet implemented
+- Image search provider
+- Image downloading and local storage
+- Gallery interface
+- Persistent settings
+- Image processing
+- Automatic Discord avatar modification
+
+This core manages image URLs and rotation callbacks only.
