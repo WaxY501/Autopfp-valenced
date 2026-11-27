@@ -1,20 +1,18 @@
 # AutoPFP Rotator
 
-## Modules
-- Image pool and random rotation core
+## Implemented source modules
+- Rotation core and timer callback
 - Wikimedia Commons image search
-- Persistent image gallery using IndexedDB
-- Import images from files
-- Download images from URLs
-- Export images from gallery
-- Image processing and square resizing
-- JPEG compression
+- Settings screen with image search results and previews
+- Add/remove images from a session gallery
+- Manual image URL entry
+- Preview rotation timer and manual previous/next
+- Session-only named collections/themes
+- Preview crop mode and size/quality preference fields
 
-## Storage
-Gallery images are stored locally in IndexedDB.
-
-## Status
-Modules are source components and are not yet fully
-integrated into a finished plugin interface.
-
-Automatic Discord account avatar modification is not included.
+## Limitations in this stage
+- Session gallery and collections are in-memory only (not persistent).
+- Device file picker is not connected; add images through search or URL.
+- Processing fields are UI settings only; actual resize/compression is not wired into the settings screen.
+- Preview rotation only changes the displayed preview. It does not modify a Discord avatar.
+- Full plugin packaging/build validation requires the Valenced API dependencies and is not performed by this workflow.
