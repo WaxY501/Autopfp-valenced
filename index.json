@@ -232,16 +232,29 @@
     },
     "com.khopdi.autopfp": {
       "name": "AutoPFP Rotator",
-      "description": "Search-themed profile picture rotation manager",
+      "description": "Rotates your profile picture through themed collections of images you choose.",
       "author": "Khopdi Todo",
       "channels": {
-        "latest": "1.0.0"
+        "latest": "2.0.0"
       },
       "versions": {
         "1.0.0": {
           "url": "https://waxy501.github.io/Autopfp-valenced/pool/com.khopdi.autopfp@1.0.0.zip",
           "sha256": "789c0419f61ed532b1122f6706aac988c321a5ff509777325650cfdda3948c16",
           "size": 5346,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        },
+        "2.0.0": {
+          "url": "https://waxy501.github.io/Autopfp-valenced/pool/com.khopdi.autopfp@2.0.0.zip",
+          "sha256": "aa06fcb402ebdb282970e3345c8c4ea9a8eceb422aaadc1613f167273fef32f7",
+          "size": 13367,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"
