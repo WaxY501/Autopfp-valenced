@@ -11,6 +11,9 @@ const STORE_NAME = 'images'
 const COLLECTION_STORE = 'collections'
 
 export type SavedCollection = { id: string; name: string; imageIds: string[]; updatedAt: number }
+const COLLECTION_STORE = 'collections'
+
+export type SavedCollection = { id: string; name: string; imageIds: string[]; updatedAt: number }
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -196,6 +199,58 @@ export class AutoPfpGallery {
   }
 
 
+    async getCollections(): Promise<SavedCollection[]> {
+    const db = await openDatabase()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(COLLECTION_STORE, 'readonly')
+      const req = tx.objectStore(COLLECTION_STORE).getAll()
+      req.onsuccess = () => resolve((req.result as SavedCollection[]).sort((a, b) => b.updatedAt - a.updatedAt))
+      req.onerror = () => reject(req.error)
+    })
+  }
+
+  async saveCollection(name: string, imageIds: string[], id?: string): Promise<SavedCollection> {
+    const cleanName = name.trim()
+    if (!cleanName || imageIds.length === 0) throw new Error('Collection name and at least one image are required')
+    const collection: SavedCollection = { id: id || crypto.randomUUID(), name: cleanName, imageIds: [...imageIds], updatedAt: Date.now() }
+    const db = await openDatabase()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(COLLECTION_STORE, 'readwrite')
+      tx.objectStore(COLLECTION_STORE).put(collection)
+      tx.oncomplete = () => resolve(collection)
+      tx.onerror = () => reject(tx.error)
+    })
+  }
+
+  async removeCollection(id: string): Promise<void> {
+    const db = await openDatabase()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(COLLECTION_STORE, 'readwrite')
+      tx.objectStore(COLLECTION_STORE).delete(id)
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error)
+    })
+  }
+
+  async pickFilesFromDevice(): Promise<GalleryImage[]> {
+    if (typeof document === 'undefined') throw new Error('Device file picker is not available in this runtime')
+    return new Promise((resolve, reject) => {
+      const input = document.createElement('input')
+      input.type = 'file'
+      input.accept = 'image/*'
+      input.multiple = true
+      input.onchange = async () => {
+        try {
+          const files = Array.from(input.files || [])
+          const added = await Promise.all(files.map(file => this.addFromFile(file)))
+          resolve(added)
+        } catch (error) { reject(error) }
+      }
+      input.click()
+    })
+  }
+
+
   async download(image: GalleryImage): Promise<void> {
     const link = document.createElement('a')
 
@@ -233,11 +288,23 @@ export class AutoPfpGallery {
     const y = (size - height) / 2
 
     if (mode === 'cover') {
+      if (mode === 'cover') {
       ctx.drawImage(img, x, y, width, height)
     } else {
       ctx.fillStyle = '#000'
       ctx.fillRect(0, 0, size, size)
       ctx.drawImage(img, x, y, width, height)
+    }
+    } else {
+      ctx.fillStyle = '#000'
+      ctx.fillRect(0, 0, size, size)
+      if (mode === 'cover') {
+      ctx.drawImage(img, x, y, width, height)
+    } else {
+      ctx.fillStyle = '#000'
+      ctx.fillRect(0, 0, size, size)
+      ctx.drawImage(img, x, y, width, height)
+    }
     }
 
     const processed = {
