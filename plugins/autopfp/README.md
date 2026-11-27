@@ -1,16 +1,10 @@
-# AutoPFP Rotator
+# AutoPFP Rotator (Valenced)
 
-## Current modules
-- Rotation preview core (preview callback only; no Discord avatar modification)
-- Wikimedia Commons image search
-- Persistent IndexedDB gallery with image import-from-URL/file and download helpers
-- Gallery UI wired to IndexedDB
-- Persistent named collections/themes stored in IndexedDB
-- Square resize and JPEG quality processing wired to settings
-- Fill/crop and fit/contain processing modes
+Rotates your Discord profile picture through collections of images you choose.
 
-## Stage 4 caveats
-- Device file import uses a web-style input picker; confirm it works in the target Valenced Android runtime.
-- URL image fetch may fail on sources that disallow cross-origin downloads.
-- The workflow performs source checks, not a full Valenced package build.
-- No automated Discord avatar modification is implemented.
+- Collections of images, added by Wikimedia Commons search or by pasting an https:// image link
+- Rotates in order or randomly, every 10+ minutes (Discord limits avatar changes, so slower is safer)
+- Images are cropped or fitted to a square and compressed on the phone (native Kotlin), then sent through Discord's own request module
+- Settings are stored with the plugin's JSON storage; nothing is sent to any server except the image downloads themselves
+
+Limits: it only rotates while Discord is open, and Discord decides how often an avatar may change.

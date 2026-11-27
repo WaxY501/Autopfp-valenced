@@ -1,19 +1,19 @@
 {
-  "format": 1,
-  "id": "com.khopdi.autopfp",
-  "name": "AutoPFP Rotator",
-  "description": "Search-themed profile picture rotation manager",
-  "author": "Khopdi Todo",
-  "version": "1.0.0",
-  "dependencies": {
-    "valenced.api": {
-      "version": ">=1 <2"
-    },
-    "discord": {
-      "version": "*"
-    }
-  },
-  "dist": {
-    "script": "index.js"
-  }
+	"format": 1,
+	"id": "com.khopdi.autopfp",
+	"name": "AutoPFP Rotator",
+	"description": "Rotates your profile picture through themed collections of images you choose.",
+	"author": "Khopdi Todo",
+	"version": "2.0.0",
+	"dependencies": {
+		"valenced.api": { "version": ">=1 <2" },
+		"discord": { "version": "*" }
+	},
+	"dist": {
+		"script": "index.js",
+		"android": {
+			"path": "plugin.jar",
+			"class": "com.khopdi.autopfp.AutoPfpPlugin"
+		}
+	}
 }

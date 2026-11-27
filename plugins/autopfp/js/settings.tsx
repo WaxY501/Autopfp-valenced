@@ -1,112 +1,212 @@
 import React, { useEffect, useState } from 'react'
-import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
-import { AutoPfpImageSearch, type SearchImage } from './imageSearch'
-import { AutoPfpGallery, type GalleryImage, type SavedCollection } from './gallery'
+import { Image, Pressable, ScrollView, Switch, Text, TextInput, View } from 'react-native'
+import { activeCollection, addImageTo, clampInterval, newId, normalize, removeImageFrom } from './core.js'
+import { diag } from './diag.js'
+import { searchImages } from './imageSearch.js'
+import { changeNow, nextChangeText } from './rotation.js'
+import { DEFAULT_SETTINGS, MIN_INTERVAL_MIN, type FitMode, type OrderMode, type PfpImage, type SearchImage, type Settings } from './types.js'
 
-const searcher = new AutoPfpImageSearch()
-const gallery = new AutoPfpGallery()
-const styles = StyleSheet.create({
-  root: { padding: 16, gap: 12 }, title: { fontSize: 20, fontWeight: '700', color: '#fff' },
-  sub: { color: '#aaa', fontSize: 12 }, row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
-  input: { backgroundColor: '#24262b', color: '#fff', padding: 10, borderRadius: 8, minWidth: 140, flexGrow: 1 },
-  button: { backgroundColor: '#5865f2', paddingVertical: 9, paddingHorizontal: 12, borderRadius: 8 },
-  buttonText: { color: '#fff', fontWeight: '600' }, card: { backgroundColor: '#202226', borderRadius: 10, padding: 10, gap: 8 },
-  image: { width: 112, height: 112, borderRadius: 8, backgroundColor: '#303238' },
-  small: { color: '#ddd', fontSize: 13 }, section: { color: '#fff', fontSize: 16, fontWeight: '600', marginTop: 4 },
-})
-function Button({ label, onPress, muted = false }: { label: string; onPress: () => void; muted?: boolean }) {
-  return <Pressable onPress={onPress} style={[styles.button, muted && { backgroundColor: '#484b52' }]}><Text style={styles.buttonText}>{label}</Text></Pressable>
+const s: any = {
+	root: { padding: 16, gap: 12 },
+	title: { fontSize: 18, fontWeight: '700', marginTop: 10 },
+	hint: { opacity: 0.7 },
+	row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+	wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+	field: { borderWidth: 1, borderColor: '#77777755', borderRadius: 8, padding: 10, flexGrow: 1, flexShrink: 1, minWidth: 120 },
+	chip: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: '#77777755' },
+	chipOn: { backgroundColor: '#5865f2', borderColor: '#5865f2' },
+	btn: { backgroundColor: '#5865f2', paddingVertical: 9, paddingHorizontal: 12, borderRadius: 8 },
+	btnMuted: { backgroundColor: '#6d6f78' },
+	btnText: { color: 'white', fontWeight: '600' },
+	card: { width: 128, gap: 6 },
+	thumb: { width: 128, height: 128, borderRadius: 10, backgroundColor: '#77777733' },
+	step: { backgroundColor: '#5865f2', width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
 }
-export default function AutoPfpSettings() {
-  const [query, setQuery] = useState('')
-  const [manualUrl, setManualUrl] = useState('')
-  const [results, setResults] = useState<SearchImage[]>([])
-  const [images, setImages] = useState<GalleryImage[]>([])
-  const [collections, setCollections] = useState<SavedCollection[]>([])
-  const [collectionName, setCollectionName] = useState('')
-  const [intervalSec, setIntervalSec] = useState('30')
-  const [running, setRunning] = useState(false)
-  const [previewIndex, setPreviewIndex] = useState(0)
-  const [cropMode, setCropMode] = useState<'cover' | 'contain'>('cover')
-  const [squareSize, setSquareSize] = useState('512')
-  const [quality, setQuality] = useState('92')
-  const [busy, setBusy] = useState(false)
-  const [status, setStatus] = useState('Loading saved gallery…')
-  useEffect(() => { void reload(); }, [])
-  useEffect(() => {
-    if (!running || images.length < 2) return
-    const ms = Math.max(10, Number(intervalSec) || 30) * 1000
-    const timer = setInterval(() => setPreviewIndex(i => (i + 1) % images.length), ms)
-    return () => clearInterval(timer)
-  }, [running, images.length, intervalSec])
-  async function reload() {
-    try { setImages(await gallery.getAll()); setCollections(await gallery.getCollections()); setStatus('Gallery loaded from local IndexedDB.') }
-    catch (e) { setStatus(e instanceof Error ? e.message : 'Gallery load failed') }
-  }
-  async function doSearch() {
-    setBusy(true); setStatus('Searching Wikimedia Commons…')
-    try { const found = await searcher.search(query, 24); setResults(found); setStatus(`${found.length} search results.`) }
-    catch (e) { setStatus(e instanceof Error ? e.message : 'Search failed') }
-    finally { setBusy(false) }
-  }
-  async function addUrl(url: string) {
-    if (!url.trim()) return
-    setBusy(true)
-    try { await gallery.addFromUrl(url.trim()); await reload(); setManualUrl(''); setStatus('Saved image to local gallery.') }
-    catch (e) { setStatus(e instanceof Error ? e.message : 'Image add failed. URL may block downloads (CORS).') }
-    finally { setBusy(false) }
-  }
-  async function importFiles() {
-    setBusy(true)
-    try { const added = await gallery.pickFilesFromDevice(); await reload(); setStatus(`${added.length} image(s) imported.`) }
-    catch (e) { setStatus(e instanceof Error ? e.message : 'File import unavailable in this runtime') }
-    finally { setBusy(false) }
-  }
-  async function removeImage(id: string) {
-    try { await gallery.remove(id); setRunning(false); setPreviewIndex(0); await reload(); setStatus('Image removed.') }
-    catch (e) { setStatus(e instanceof Error ? e.message : 'Remove failed') }
-  }
-  async function saveTheme() {
-    if (!collectionName.trim() || images.length === 0) { setStatus('Name the collection and add at least one image.'); return }
-    try { await gallery.saveCollection(collectionName, images.map(i => i.id)); setCollectionName(''); setCollections(await gallery.getCollections()); setStatus('Collection saved persistently.') }
-    catch (e) { setStatus(e instanceof Error ? e.message : 'Save collection failed') }
-  }
-  async function loadTheme(c: SavedCollection) {
-    try { const all = await gallery.getAll(); const chosen = c.imageIds.map(id => all.find(img => img.id === id)).filter((img): img is GalleryImage => Boolean(img)); setImages(chosen); setPreviewIndex(0); setRunning(false); setStatus(`Loaded ${c.name} (${chosen.length} images).`) }
-    catch (e) { setStatus(e instanceof Error ? e.message : 'Load collection failed') }
-  }
-  async function deleteTheme(id: string) {
-    try { await gallery.removeCollection(id); setCollections(await gallery.getCollections()); setStatus('Collection deleted.') }
-    catch (e) { setStatus(e instanceof Error ? e.message : 'Delete collection failed') }
-  }
-  async function processAll() {
-    const size = Math.min(2048, Math.max(64, Math.round(Number(squareSize) || 512)))
-    const q = Math.min(100, Math.max(10, Number(quality) || 92)) / 100
-    setBusy(true)
-    try { await Promise.all(images.map(img => gallery.processImage(img, size, q, cropMode))); await reload(); setStatus(`Processed ${images.length} image(s): ${size}px square, JPEG ${Math.round(q * 100)}%, ${cropMode}.`) }
-    catch (e) { setStatus(e instanceof Error ? e.message : 'Image processing failed') }
-    finally { setBusy(false) }
-  }
-  return <ScrollView contentContainerStyle={styles.root}>
-    <Text style={styles.title}>AutoPFP Rotator</Text>
-    <Text style={styles.sub}>Persistent local gallery and preview tools. This does not modify your Discord avatar.</Text>
-    <Text style={styles.section}>Search images</Text>
-    <View style={styles.row}><TextInput style={styles.input} value={query} onChangeText={setQuery} placeholder="Theme or subject" placeholderTextColor="#999"/><Button label={busy ? 'Working…' : 'Search'} onPress={doSearch}/></View>
-    <Text style={styles.sub}>{status}</Text>
-    <View style={styles.row}>{results.map((r,i)=><View style={styles.card} key={`${r.originalUrl}-${i}`}><Image source={{uri:r.url}} style={styles.image} resizeMode="cover"/><Text style={styles.small} numberOfLines={2}>{r.title}</Text><Button label="Add" onPress={()=>void addUrl(r.originalUrl)}/></View>)}</View>
-    <Text style={styles.section}>Import / add by URL</Text>
-    <View style={styles.row}><Button label="Import from device" onPress={()=>void importFiles()}/><TextInput style={styles.input} value={manualUrl} onChangeText={setManualUrl} placeholder="HTTPS image URL" placeholderTextColor="#999" autoCapitalize="none"/><Button label="Add URL" onPress={()=>void addUrl(manualUrl)}/></View>
-    <Text style={styles.section}>Persistent gallery ({images.length})</Text>
-    {images.length===0 ? <Text style={styles.sub}>Gallery is empty. Import or add an image above.</Text> : <View style={styles.row}>{images.map((img,i)=><View style={styles.card} key={img.id}><Image source={{uri:img.dataUrl}} style={styles.image} resizeMode={cropMode}/><Text style={styles.small} numberOfLines={2}>{img.name}</Text><Button label="Remove" muted onPress={()=>void removeImage(img.id)}/></View>)}</View>}
-    <Text style={styles.section}>Preview rotation</Text>
-    <View style={styles.row}><TextInput style={[styles.input,{minWidth:90,flexGrow:0}]} value={intervalSec} onChangeText={setIntervalSec} keyboardType="numeric"/><Text style={styles.small}>seconds (min 10)</Text><Button label="Start" onPress={()=>{if(images.length<2){setStatus('Add at least 2 images to preview.');return}setRunning(true);setStatus('Preview running.')}}/><Button label="Stop" muted onPress={()=>{setRunning(false);setStatus('Preview stopped.')}}/></View>
-    {images.length>0&&<View style={styles.card}><Image source={{uri:images[Math.min(previewIndex,images.length-1)].dataUrl}} style={{width:240,height:240,alignSelf:'center',borderRadius:12}} resizeMode={cropMode}/><Text style={styles.small}>Preview {Math.min(previewIndex+1,images.length)} / {images.length} · {running?'Playing':'Paused'}</Text><View style={styles.row}><Button label="Previous" muted onPress={()=>setPreviewIndex(i=>(i-1+images.length)%images.length)}/><Button label="Next" muted onPress={()=>setPreviewIndex(i=>(i+1)%images.length)}/></View></View>}
-    <Text style={styles.section}>Saved collections</Text>
-    <View style={styles.row}><TextInput style={styles.input} value={collectionName} onChangeText={setCollectionName} placeholder="Collection name" placeholderTextColor="#999"/><Button label="Save current" onPress={()=>void saveTheme()}/></View>
-    {collections.map(c=><View style={styles.row} key={c.id}><Text style={styles.small}>{c.name} · {c.imageIds.length} saved</Text><Button label="Load" onPress={()=>void loadTheme(c)}/><Button label="Delete" muted onPress={()=>void deleteTheme(c.id)}/></View>)}
-    <Text style={styles.section}>Real image processing</Text>
-    <View style={styles.row}><Button label={cropMode==='cover'?'Crop: Fill':'Crop: Fit'} muted onPress={()=>setCropMode(m=>m==='cover'?'contain':'cover')}/><Text style={styles.small}>mode: {cropMode}</Text></View>
-    <View style={styles.row}><TextInput style={[styles.input,{minWidth:80,flexGrow:0}]} value={squareSize} onChangeText={setSquareSize} keyboardType="numeric"/><Text style={styles.small}>px</Text><TextInput style={[styles.input,{minWidth:80,flexGrow:0}]} value={quality} onChangeText={setQuality} keyboardType="numeric"/><Text style={styles.small}>JPEG quality %</Text><Button label={busy?'Processing…':'Process gallery'} onPress={()=>void processAll()}/></View>
-    <Text style={styles.sub}>Processing saves resized square JPEGs over the selected gallery images. Device import uses a web-style file input; runtime support on Valenced Android still needs testing.</Text>
-  </ScrollView>
+
+function Btn({ label, onPress, muted }: { label: string; onPress: () => void; muted?: boolean }) {
+	return (
+		<Pressable style={[s.btn, muted && s.btnMuted]} onPress={onPress}>
+			<Text style={s.btnText}>{label}</Text>
+		</Pressable>
+	)
+}
+
+function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) {
+	return (
+		<Pressable style={[s.chip, on && s.chipOn]} onPress={onPress}>
+			<Text style={on ? { color: 'white', fontWeight: '600' } : undefined}>{label}</Text>
+		</Pressable>
+	)
+}
+
+export function SettingsScreen({ api }: { api: any }) {
+	const storage = api.jsonStorage
+	const data: Settings = normalize(storage.use())
+	const col = activeCollection(data)
+
+	/** Always reads the newest stored value, so a background change is never overwritten with an old copy. */
+	const commit = (patch: Partial<Settings>) => {
+		void storage.set({ ...normalize(storage.cache), ...patch }, true)
+	}
+
+	const [, setTick] = useState(0)
+	useEffect(() => {
+		const t = setInterval(() => setTick(n => n + 1), 1000)
+		return () => clearInterval(t)
+	}, [])
+
+	const [query, setQuery] = useState('')
+	const [results, setResults] = useState<SearchImage[]>([])
+	const [url, setUrl] = useState('')
+	const [newName, setNewName] = useState('')
+	const [msg, setMsg] = useState('')
+	const [busy, setBusy] = useState(false)
+	const [confirmDelete, setConfirmDelete] = useState(false)
+
+	function updateActive(next: typeof col) {
+		commit({ collections: data.collections.map(c => (c.id === next.id ? next : c)) })
+	}
+
+	function addToActive(imageUrl: string, title?: string) {
+		const r = addImageTo(col, imageUrl, title)
+		if (!r.added) return setMsg(r.reason ?? 'Could not add.')
+		updateActive(r.collection)
+		setMsg(`Added to "${col.name}".`)
+	}
+
+	async function doSearch() {
+		setBusy(true)
+		setMsg('Searching Wikimedia Commons\u2026')
+		try {
+			const found = await searchImages(query)
+			setResults(found)
+			setMsg(found.length ? `${found.length} results.` : 'No results. Try another word.')
+		} catch (e: any) {
+			setMsg(String(e?.message ?? e))
+		} finally {
+			setBusy(false)
+		}
+	}
+
+	function createCollection() {
+		const name = newName.trim()
+		if (!name) return setMsg('Type a name first.')
+		const id = newId()
+		commit({ collections: [...data.collections, { id, name, images: [] }], activeId: id })
+		setNewName('')
+		setMsg(`Created "${name}".`)
+	}
+
+	function deleteCollection() {
+		if (data.collections.length < 2) return setMsg('You need at least one collection.')
+		if (!confirmDelete) {
+			setConfirmDelete(true)
+			return setMsg(`Tap Delete again to remove "${col.name}" and its ${col.images.length} images.`)
+		}
+		const rest = data.collections.filter(c => c.id !== col.id)
+		commit({ collections: rest, activeId: rest[0].id, state: { ...data.state, cursor: 0 } })
+		setConfirmDelete(false)
+		setMsg('Collection deleted.')
+	}
+
+	async function useNow(image?: PfpImage) {
+		setBusy(true)
+		setMsg(await changeNow(image))
+		setBusy(false)
+	}
+
+	return (
+		<ScrollView>
+			<View style={s.root}>
+				<Text style={s.title}>AutoPFP Rotator</Text>
+				<Text style={s.hint}>
+					{[
+						`Image engine: ${diag.native}`,
+						`Discord requests: ${diag.rest}`,
+						nextChangeText(data),
+						`Last: ${diag.lastResult}`,
+					].join('\n')}
+				</Text>
+
+				<View style={s.row}>
+					<Text style={{ flex: 1 }}>Rotate my profile picture automatically</Text>
+					<Switch value={data.rotating} onValueChange={v => commit({ rotating: v })} />
+				</View>
+				<View style={s.row}>
+					<Text style={{ flex: 1 }}>Change every</Text>
+					<View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+						<Pressable style={s.step} onPress={() => commit({ intervalMin: clampInterval(data.intervalMin - 5) })}><Text style={s.btnText}>{'\u2212'}</Text></Pressable>
+						<Text style={{ minWidth: 70, textAlign: 'center', fontWeight: '700' }}>{data.intervalMin} min</Text>
+						<Pressable style={s.step} onPress={() => commit({ intervalMin: clampInterval(data.intervalMin + 5) })}><Text style={s.btnText}>+</Text></Pressable>
+					</View>
+				</View>
+				<Text style={s.hint}>
+					At least {MIN_INTERVAL_MIN} minutes. Discord limits how often an avatar can change, so slower is safer. It only rotates while Discord is open.
+				</Text>
+				<View style={s.wrap}>
+					<Chip label="In order" on={data.order === 'sequential'} onPress={() => commit({ order: 'sequential' as OrderMode })} />
+					<Chip label="Random" on={data.order === 'random'} onPress={() => commit({ order: 'random' as OrderMode })} />
+					<Chip label="Fill (crop)" on={data.fit === 'cover'} onPress={() => commit({ fit: 'cover' as FitMode })} />
+					<Chip label="Fit (bars)" on={data.fit === 'contain'} onPress={() => commit({ fit: 'contain' as FitMode })} />
+				</View>
+				<View style={s.wrap}>
+					<Btn label={busy ? 'Working\u2026' : 'Change now'} onPress={() => void useNow()} />
+				</View>
+				{!!msg && <Text style={s.hint}>{msg}</Text>}
+
+				<Text style={s.title}>Collections</Text>
+				<View style={s.wrap}>
+					{data.collections.map(c => (
+						<Chip key={c.id} label={`${c.name} (${c.images.length})`} on={c.id === col.id} onPress={() => { setConfirmDelete(false); commit({ activeId: c.id, state: { ...data.state, cursor: 0 } }) }} />
+					))}
+				</View>
+				<View style={s.wrap}>
+					<TextInput style={s.field} value={newName} onChangeText={setNewName} placeholder="New collection name" autoCapitalize="none" />
+					<Btn label="Create" onPress={createCollection} />
+					<Btn label="Delete this one" muted onPress={deleteCollection} />
+				</View>
+
+				<Text style={s.title}>Add images to "{col.name}"</Text>
+				<View style={s.wrap}>
+					<TextInput style={s.field} value={query} onChangeText={setQuery} placeholder="Search Wikimedia Commons" autoCapitalize="none" onSubmitEditing={() => void doSearch()} />
+					<Btn label={busy ? '\u2026' : 'Search'} onPress={() => void doSearch()} />
+				</View>
+				<View style={s.wrap}>
+					<TextInput style={s.field} value={url} onChangeText={setUrl} placeholder="Or paste an https:// image link" autoCapitalize="none" autoCorrect={false} />
+					<Btn label="Add link" onPress={() => { addToActive(url); setUrl('') }} />
+				</View>
+				{results.length > 0 && (
+					<View style={s.wrap}>
+						{results.map((r, i) => (
+							<View key={`${r.url}-${i}`} style={s.card}>
+								<Image source={{ uri: r.url }} style={s.thumb} resizeMode="cover" />
+								<Text numberOfLines={2} style={{ fontSize: 12 }}>{r.title}</Text>
+								<Btn label="Add" onPress={() => addToActive(r.url, r.title)} />
+							</View>
+						))}
+					</View>
+				)}
+
+				<Text style={s.title}>In this collection ({col.images.length})</Text>
+				{col.images.length === 0 ? (
+					<Text style={s.hint}>Nothing here yet. Search above or paste a link.</Text>
+				) : (
+					<View style={s.wrap}>
+						{col.images.map(img => (
+							<View key={img.id} style={s.card}>
+								<Image source={{ uri: img.url }} style={s.thumb} resizeMode="cover" />
+								<Text numberOfLines={2} style={{ fontSize: 12 }}>{img.title}</Text>
+								<Btn label="Use now" onPress={() => void useNow(img)} />
+								<Btn label="Remove" muted onPress={() => updateActive(removeImageFrom(col, img.id))} />
+							</View>
+						))}
+					</View>
+				)}
+
+				<Pressable onPress={() => commit({ size: DEFAULT_SETTINGS.size, quality: DEFAULT_SETTINGS.quality })}>
+					<Text style={{ color: '#5865f2' }}>Reset image size and quality ({data.size}px, {data.quality}%)</Text>
+				</Pressable>
+			</View>
+		</ScrollView>
+	)
 }
